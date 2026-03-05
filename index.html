@@ -304,40 +304,12 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
 .text-display .word {
   display: inline; padding: 0.12em 0.04em;
   border-radius: 4px; cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease,
-              border-bottom-color 0.12s ease, font-weight 0.12s ease;
-  border-bottom: 2px solid transparent;
+  transition: all 0.18s ease; border-bottom: 2px solid transparent;
 }
 
 .text-display .word:hover {
   background: rgba(255,255,255,0.07);
   border-bottom-color: rgba(255,255,255,0.15);
-}
-
-/* Preview highlight while dragging */
-.text-display .word.preview-Co {
-  background: var(--condition); color: #fff; border-radius: 5px;
-  padding: 0.08em 0.3em; margin: 0 0.04em; font-weight: 600;
-  box-shadow: 0 2px 10px rgba(230,57,70,0.25);
-  border-bottom-color: transparent; opacity: 0.7;
-}
-.text-display .word.preview-Cx {
-  background: var(--context); color: #fff; border-radius: 5px;
-  padding: 0.08em 0.3em; margin: 0 0.04em; font-weight: 600;
-  box-shadow: 0 2px 10px rgba(42,157,143,0.25);
-  border-bottom-color: transparent; opacity: 0.7;
-}
-.text-display .word.preview-Pop {
-  background: var(--population); color: #1a1a1a; border-radius: 5px;
-  padding: 0.08em 0.3em; margin: 0 0.04em; font-weight: 600;
-  box-shadow: 0 2px 10px rgba(233,196,106,0.25);
-  border-bottom-color: transparent; opacity: 0.7;
-}
-.text-display .word.preview-clear {
-  background: rgba(255,255,255,0.12); color: var(--text-muted);
-  border-radius: 5px; padding: 0.08em 0.3em;
-  text-decoration: line-through; opacity: 0.6;
-  border-bottom-color: transparent;
 }
 
 .text-display .word.cat-Co {
@@ -370,30 +342,18 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
   outline: 2px dashed var(--accent); outline-offset: 3px;
 }
 
-/* Drag cursor feedback */
+.text-display .word.selecting {
+  background: rgba(88,166,255,0.25);
+  border-bottom-color: var(--accent);
+  border-radius: 4px;
+}
+
+.text-display .word.selecting-Co { background: rgba(230,57,70,0.3); border-bottom-color: var(--condition); }
+.text-display .word.selecting-Cx { background: rgba(42,157,143,0.3); border-bottom-color: var(--context); }
+.text-display .word.selecting-Pop { background: rgba(233,196,106,0.3); border-bottom-color: var(--population); }
+
 .text-display.dragging { cursor: crosshair; }
 .text-display.dragging .word { cursor: crosshair; }
-
-/* Selection instruction hint */
-.selection-hint {
-  position: fixed; bottom: 5.5rem; left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 10px; padding: 0.6rem 1.2rem;
-  font-size: 0.8rem; color: var(--text-secondary);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  z-index: 150; white-space: nowrap;
-  opacity: 0; transition: opacity 0.3s ease;
-  pointer-events: none;
-  display: flex; align-items: center; gap: 0.5rem;
-}
-.selection-hint.visible { opacity: 1; }
-.selection-hint .hint-icon { font-size: 1rem; }
-.selection-hint kbd {
-  background: rgba(255,255,255,0.1); border: 1px solid var(--border);
-  border-radius: 4px; padding: 0.1em 0.4em;
-  font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
-}
 
 /* Summary */
 .summary-section { margin-top: 2rem; }
@@ -543,10 +503,6 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="selection-hint" id="selectionHint">
-  <span class="hint-icon">🖱️</span>
-  Clique e arraste para selecionar · <kbd>Shift</kbd>+clique para intervalo · Clique para uma palavra
-</div>
 
 <header>
   <div class="logo">
@@ -583,6 +539,10 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
       <div class="form-actions">
         <button class="btn btn-primary" onclick="saveCase()">💾 Salvar Caso</button>
         <button class="btn" onclick="newCase()">+ Novo Caso</button>
+        <span style="border-left:1px solid var(--border);height:24px;margin:0 0.3rem;"></span>
+        <button class="btn" onclick="exportJSON()">📥 Exportar JSON</button>
+        <button class="btn" onclick="document.getElementById('importFile').click()">📤 Importar JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
       </div>
     </div>
   </div>
@@ -675,13 +635,6 @@ let activeTool = null;
 let activeCaseId = null;
 let editingCaseId = null;
 let words = [];
-let shiftAnchor = null;
-
-// Drag selection state
-let isDragging = false;
-let dragStartId = null;
-let dragCurrentId = null;
-let previewIds = new Set();
 
 // Storage
 function loadCases() {
@@ -791,7 +744,7 @@ function activateCase(id) {
   activeCaseId = id;
 
   document.getElementById('displayTitle').textContent = c.title;
-  document.getElementById('displaySubtitle').textContent = 'Clique e arraste nas palavras após selecionar a categoria';
+  document.getElementById('displaySubtitle').textContent = 'Selecione a categoria e arraste sobre as palavras para classificar';
 
   tokenize(c.text);
   const cm = loadClassMap(id);
@@ -801,6 +754,7 @@ function activateCase(id) {
   renderSummary();
   renderCasesList();
 
+  // Update selector
   const sel = document.getElementById('caseSelect');
   sel.value = id;
 }
@@ -841,183 +795,13 @@ function tokenize(text) {
   (text.match(/\S+/g) || []).forEach((t, i) => words.push({ text: t, cat: null, id: i }));
 }
 
-// ---- DRAG SELECTION SYSTEM ----
-
-function getWordIdFromEl(el) {
-  const wordEl = el.closest ? el.closest('.word') : null;
-  if (!wordEl) return null;
-  const id = wordEl.getAttribute('data-id');
-  return id !== null ? parseInt(id) : null;
-}
-
-function getRangeIds(startId, endId) {
-  if (startId === null || endId === null) return [];
-  const from = Math.min(startId, endId);
-  const to = Math.max(startId, endId);
-  const ids = [];
-  for (let i = from; i <= to; i++) ids.push(i);
-  return ids;
-}
-
-function applyPreview(ids) {
-  // Clear old previews
-  document.querySelectorAll('.text-display .word').forEach(el => {
-    el.classList.remove('preview-Co', 'preview-Cx', 'preview-Pop', 'preview-clear');
-  });
-  previewIds = new Set(ids);
-  if (!activeTool || !ids.length) return;
-  const previewClass = 'preview-' + activeTool;
-  ids.forEach(id => {
-    const el = document.querySelector(`.word[data-id="${id}"]`);
-    if (el && !el.classList.contains('cat-' + activeTool)) {
-      el.classList.add(previewClass);
-    }
-  });
-}
-
-function clearPreview() {
-  document.querySelectorAll('.text-display .word').forEach(el => {
-    el.classList.remove('preview-Co', 'preview-Cx', 'preview-Pop', 'preview-clear');
-  });
-  previewIds.clear();
-}
-
-function commitSelection(ids) {
-  if (!activeTool || !ids.length) return;
-  ids.forEach(id => {
-    if (words[id]) {
-      words[id].cat = activeTool === 'clear' ? null : activeTool;
-    }
-  });
-  renderText();
-  renderSummary();
-  autoSave();
-}
-
-// Mouse/touch handlers on textDisplay
-function initDragSelection() {
-  const display = document.getElementById('textDisplay');
-
-  // Mouse events
-  display.addEventListener('mousedown', e => {
-    const id = getWordIdFromEl(e.target);
-    if (id === null) return;
-    if (!activeTool) { toast('Selecione uma categoria: Condition, Context ou Population'); return; }
-
-    // Shift+click range from anchor
-    if (e.shiftKey && shiftAnchor !== null && shiftAnchor !== id) {
-      const range = getRangeIds(shiftAnchor, id);
-      commitSelection(range);
-      shiftAnchor = id;
-      return;
-    }
-
-    e.preventDefault();
-    isDragging = true;
-    dragStartId = id;
-    dragCurrentId = id;
-    display.classList.add('dragging');
-
-    // Immediate preview of single word
-    applyPreview([id]);
-  });
-
-  display.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    const id = getWordIdFromEl(e.target);
-    if (id === null || id === dragCurrentId) return;
-    dragCurrentId = id;
-    const range = getRangeIds(dragStartId, dragCurrentId);
-    applyPreview(range);
-  });
-
-  display.addEventListener('mouseup', e => {
-    if (!isDragging) {
-      // If it wasn't a drag (e.g. click on empty space), do nothing
-      return;
-    }
-    isDragging = false;
-    display.classList.remove('dragging');
-
-    const range = getRangeIds(dragStartId, dragCurrentId);
-    clearPreview();
-    commitSelection(range);
-    shiftAnchor = dragCurrentId;
-    dragStartId = null;
-    dragCurrentId = null;
-  });
-
-  // Handle mouse leaving the display area
-  display.addEventListener('mouseleave', e => {
-    if (!isDragging) return;
-    // Keep the drag active but don't cancel - user can come back
-  });
-
-  // Cancel on mouseup anywhere outside
-  document.addEventListener('mouseup', e => {
-    if (!isDragging) return;
-    if (!display.contains(e.target)) {
-      // Mouse released outside - commit what we have
-      isDragging = false;
-      display.classList.remove('dragging');
-      const range = getRangeIds(dragStartId, dragCurrentId);
-      clearPreview();
-      commitSelection(range);
-      shiftAnchor = dragCurrentId;
-      dragStartId = null;
-      dragCurrentId = null;
-    }
-  });
-
-  // Touch events for mobile
-  display.addEventListener('touchstart', e => {
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const id = getWordIdFromEl(el);
-    if (id === null) return;
-    if (!activeTool) { toast('Selecione uma categoria primeiro'); return; }
-
-    e.preventDefault();
-    isDragging = true;
-    dragStartId = id;
-    dragCurrentId = id;
-    display.classList.add('dragging');
-    applyPreview([id]);
-  }, { passive: false });
-
-  display.addEventListener('touchmove', e => {
-    if (!isDragging) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const id = getWordIdFromEl(el);
-    if (id === null || id === dragCurrentId) return;
-    dragCurrentId = id;
-    const range = getRangeIds(dragStartId, dragCurrentId);
-    applyPreview(range);
-  }, { passive: false });
-
-  display.addEventListener('touchend', e => {
-    if (!isDragging) return;
-    isDragging = false;
-    display.classList.remove('dragging');
-    const range = getRangeIds(dragStartId, dragCurrentId);
-    clearPreview();
-    commitSelection(range);
-    shiftAnchor = dragCurrentId;
-    dragStartId = null;
-    dragCurrentId = null;
-  });
-}
-
 // Render
 function renderText() {
   const el = document.getElementById('textDisplay');
   if (!words.length) { renderEmpty(); return; }
   el.innerHTML = words.map(w => {
     const cls = w.cat ? `cat-${w.cat}` : '';
-    const anc = shiftAnchor === w.id ? ' anchor' : '';
-    return `<span class="word ${cls}${anc}" data-id="${w.id}">${esc(w.text)}</span> `;
+    return `<span class="word ${cls}" data-id="${w.id}">${esc(w.text)}</span> `;
   }).join('');
 }
 
@@ -1058,26 +842,128 @@ function renderSummary() {
 // Tools
 function selectTool(cat) {
   activeTool = cat;
-  shiftAnchor = null;
   document.querySelectorAll('.tool-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.cat === cat)
   );
-  // Show hint when a tool is selected
-  const hint = document.getElementById('selectionHint');
-  if (cat && cat !== 'reset') {
-    hint.classList.add('visible');
-    clearTimeout(hint._timer);
-    hint._timer = setTimeout(() => hint.classList.remove('visible'), 4000);
-  } else {
-    hint.classList.remove('visible');
+}
+
+// Drag-select state
+let isDragging = false;
+let dragStart = null;
+let dragEnd = null;
+
+function getWordIdFromEvent(e) {
+  const el = e.target.closest('.word[data-id]');
+  return el ? parseInt(el.dataset.id) : null;
+}
+
+function updateDragHighlight() {
+  if (dragStart === null) return;
+  const from = Math.min(dragStart, dragEnd ?? dragStart);
+  const to = Math.max(dragStart, dragEnd ?? dragStart);
+  const catClass = activeTool && activeTool !== 'clear' ? `selecting-${activeTool}` : '';
+  document.querySelectorAll('#textDisplay .word').forEach(el => {
+    const wid = parseInt(el.dataset.id);
+    el.classList.remove('selecting', 'selecting-Co', 'selecting-Cx', 'selecting-Pop');
+    if (wid >= from && wid <= to) {
+      el.classList.add('selecting');
+      if (catClass) el.classList.add(catClass);
+    }
+  });
+}
+
+function applyDragSelection() {
+  if (dragStart === null) return;
+  const from = Math.min(dragStart, dragEnd ?? dragStart);
+  const to = Math.max(dragStart, dragEnd ?? dragStart);
+  for (let i = from; i <= to; i++) {
+    words[i].cat = activeTool === 'clear' ? null : activeTool;
   }
+  renderText();
+  renderSummary();
+  autoSave();
+}
+
+function initDragSelect() {
+  const display = document.getElementById('textDisplay');
+
+  display.addEventListener('mousedown', e => {
+    const id = getWordIdFromEvent(e);
+    if (id === null || !words.length) return;
+    if (!activeTool) { toast('Selecione uma categoria: Condition, Context ou Population'); return; }
+    e.preventDefault();
+    isDragging = true;
+    dragStart = id;
+    dragEnd = id;
+    display.classList.add('dragging');
+    updateDragHighlight();
+  });
+
+  display.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const id = getWordIdFromEvent(e);
+    if (id !== null && id !== dragEnd) {
+      dragEnd = id;
+      updateDragHighlight();
+    }
+  });
+
+  const finishDrag = () => {
+    if (!isDragging) return;
+    isDragging = false;
+    document.getElementById('textDisplay').classList.remove('dragging');
+    applyDragSelection();
+    dragStart = null;
+    dragEnd = null;
+  };
+
+  display.addEventListener('mouseup', finishDrag);
+  document.addEventListener('mouseup', () => {
+    if (isDragging) finishDrag();
+  });
+
+  // Touch support for tablets/phones
+  display.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const wordEl = el?.closest('.word[data-id]');
+    if (!wordEl || !words.length) return;
+    if (!activeTool) { toast('Selecione uma categoria: Condition, Context ou Population'); return; }
+    e.preventDefault();
+    isDragging = true;
+    dragStart = parseInt(wordEl.dataset.id);
+    dragEnd = dragStart;
+    display.classList.add('dragging');
+    updateDragHighlight();
+  }, { passive: false });
+
+  display.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const wordEl = el?.closest('.word[data-id]');
+    if (wordEl) {
+      const id = parseInt(wordEl.dataset.id);
+      if (id !== dragEnd) {
+        dragEnd = id;
+        updateDragHighlight();
+      }
+    }
+  }, { passive: false });
+
+  display.addEventListener('touchend', e => {
+    if (isDragging) {
+      e.preventDefault();
+      finishDrag();
+    }
+  });
 }
 
 function resetAll() {
   if (!words.length) return;
   if (!confirm('Limpar todas as classificações deste caso?')) return;
   words.forEach(w => w.cat = null);
-  shiftAnchor = null;
   renderText();
   renderSummary();
   autoSave();
@@ -1089,6 +975,81 @@ function autoSave() {
   const m = {};
   words.forEach(w => { if (w.cat) m[w.id] = w.cat; });
   persistClassMap(activeCaseId, m);
+}
+
+// Export / Import JSON
+function exportJSON() {
+  const cases = loadCases();
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    version: 'cocopop-1.0',
+    cases: cases.map(c => ({
+      id: c.id,
+      title: c.title,
+      text: c.text,
+      classifications: loadClassMap(c.id)
+    }))
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `cocopop_${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('JSON exportado ✓');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.cases || !Array.isArray(data.cases)) {
+        toast('Arquivo JSON inválido: campo "cases" ausente');
+        return;
+      }
+      const mode = confirm(
+        `Importar ${data.cases.length} caso(s).\n\n` +
+        `OK = Mesclar (adiciona sem apagar existentes)\n` +
+        `Cancelar = Substituir tudo (apaga existentes)`
+      );
+      const existingCases = mode ? loadCases() : [];
+      // If replacing, clear old classification maps
+      if (!mode) {
+        loadCases().forEach(c => localStorage.removeItem('cocopop_cl_' + c.id));
+      }
+      const existingIds = new Set(existingCases.map(c => c.id));
+      let added = 0, updated = 0;
+      data.cases.forEach(ic => {
+        const caseObj = { id: ic.id, title: ic.title, text: ic.text };
+        if (existingIds.has(ic.id)) {
+          const idx = existingCases.findIndex(c => c.id === ic.id);
+          existingCases[idx] = caseObj;
+          updated++;
+        } else {
+          existingCases.push(caseObj);
+          added++;
+        }
+        // Import classifications if present
+        if (ic.classifications && Object.keys(ic.classifications).length) {
+          persistClassMap(ic.id, ic.classifications);
+        }
+      });
+      persistCases(existingCases);
+      renderCasesList();
+      refreshSelector();
+      if (existingCases.length) activateCase(existingCases[0].id);
+      toast(`Importado: ${added} novo(s), ${updated} atualizado(s) ✓`);
+    } catch (err) {
+      toast('Erro ao ler JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // Utils
@@ -1109,14 +1070,6 @@ document.addEventListener('keydown', e => {
     selectTool(null);
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('passwordModal').classList.add('hidden');
-    // Cancel any ongoing drag
-    if (isDragging) {
-      isDragging = false;
-      document.getElementById('textDisplay').classList.remove('dragging');
-      clearPreview();
-      dragStartId = null;
-      dragCurrentId = null;
-    }
   }
   if (!e.target.matches('input, textarea, select')) {
     if (e.key === '1') selectTool('Co');
@@ -1132,8 +1085,8 @@ document.getElementById('passwordModal').addEventListener('click', e => {
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
+  initDragSelect();
   refreshSelector();
-  initDragSelection();
   const cases = loadCases();
   if (cases.length) activateCase(cases[0].id);
 });
