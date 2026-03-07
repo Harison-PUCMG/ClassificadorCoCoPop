@@ -543,6 +543,7 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
         <button class="btn" onclick="newCase()">+ Novo Caso</button>
         <span style="border-left:1px solid var(--border);height:24px;margin:0 0.3rem;"></span>
         <button class="btn" onclick="exportJSON()">📥 Exportar JSON</button>
+        <button class="btn" onclick="exportPDF()">📄 Exportar PDF</button>
         <button class="btn" onclick="document.getElementById('importFile').click()">📤 Importar JSON</button>
         <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
       </div>
@@ -1001,6 +1002,149 @@ function exportJSON() {
   a.click();
   URL.revokeObjectURL(url);
   toast('JSON exportado ✓');
+}
+
+async function exportPDF() {
+  const cases = loadCases();
+  if (!cases.length) { toast('Nenhum caso cadastrado para exportar'); return; }
+
+  toast('Gerando PDF…');
+
+  const catColors = {
+    Co:  { bg: '#E63946', text: '#fff', label: 'Condition (Condição)', border: '#E6394660', tagBg: '#E6394630' },
+    Cx:  { bg: '#2A9D8F', text: '#fff', label: 'Context (Contexto)', border: '#2A9D8F60', tagBg: '#2A9D8F30' },
+    Pop: { bg: '#E9C46A', text: '#1a1a1a', label: 'Population (População)', border: '#E9C46A70', tagBg: '#E9C46A35' }
+  };
+
+  let casesHtml = '';
+
+  cases.forEach((c, ci) => {
+    const cm = loadClassMap(c.id);
+    const caseWords = [];
+    (c.text.match(/\S+/g) || []).forEach((t, i) => caseWords.push({ text: t, cat: cm[i] || null, id: i }));
+
+    const textHtml = caseWords.map(w => {
+      if (w.cat && catColors[w.cat]) {
+        const cc = catColors[w.cat];
+        return '<span style="background:'+cc.bg+';color:'+cc.text+';border-radius:5px;padding:2px 7px;margin:0 1px;font-weight:600;">'+esc(w.text)+'</span>';
+      }
+      return '<span>'+esc(w.text)+'</span>';
+    }).join(' ');
+
+    const cats = { Co: [], Cx: [], Pop: [] };
+    let i = 0;
+    while (i < caseWords.length) {
+      const w = caseWords[i];
+      if (w.cat && cats[w.cat]) {
+        let phrase = [w.text]; let j = i + 1;
+        while (j < caseWords.length && caseWords[j].cat === w.cat) { phrase.push(caseWords[j].text); j++; }
+        cats[w.cat].push(phrase.join(' '));
+        i = j;
+      } else { i++; }
+    }
+
+    const hasClassifications = Object.values(cats).some(a => a.length);
+
+    casesHtml += '<div class="case-block">';
+    casesHtml += '<div class="case-number">Caso '+(ci+1)+' de '+cases.length+'</div>';
+    casesHtml += '<div class="case-title">'+esc(c.title)+'</div>';
+    casesHtml += '<div class="case-text">'+textHtml+'</div>';
+
+    if (hasClassifications) {
+      casesHtml += '<table class="summary-tbl"><thead><tr><th style="width:200px;">Componente</th><th>Termos Identificados</th></tr></thead><tbody>';
+      ['Co','Cx','Pop'].forEach(cat => {
+        const cc = catColors[cat];
+        const tags = cats[cat].length
+          ? cats[cat].map(t => '<span class="tag" style="background:'+cc.tagBg+';color:'+cc.bg+';border:1px solid '+cc.border+';">'+esc(t)+'</span>').join(' ')
+          : '<span style="color:#6E7681;">—</span>';
+        casesHtml += '<tr><td class="comp-cell"><span class="cat-dot" style="background:'+cc.bg+';"></span><span style="color:'+cc.bg+';">'+cc.label+'</span></td><td class="tags-cell">'+tags+'</td></tr>';
+      });
+      casesHtml += '</tbody></table>';
+    } else {
+      casesHtml += '<div style="color:#6E7681;font-size:12px;font-style:italic;margin-top:8px;">Nenhuma classificação realizada neste caso.</div>';
+    }
+    casesHtml += '</div>';
+  });
+
+  const fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>CoCoPop — Exportação PDF</title>' +
+  '<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">' +
+  '<style>' +
+  '@page { size: A4; margin: 18mm 15mm; }' +
+  '*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }' +
+  'body { font-family: "Source Sans 3", sans-serif; background: #0D1117; color: #E6EDF3; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }' +
+
+  '.cover { padding: 50px 40px; min-height: 220px; background: linear-gradient(135deg, #161B22, #0D1117); border-bottom: 3px solid #30363D; page-break-after: always; }' +
+  '.cover-title { font-family: "Playfair Display", serif; font-weight: 900; font-size: 40px; letter-spacing: -0.02em; margin-bottom: 8px; color: #E63946; }' +
+  '.cover-title span.t1 { color: #E63946; } .cover-title span.t2 { color: #2A9D8F; } .cover-title span.t3 { color: #E9C46A; }' +
+  '.cover-sub { font-size: 14px; color: #8B949E; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 24px; }' +
+  '.cover-legend { display: flex; gap: 20px; margin-top: 10px; }' +
+  '.cover-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }' +
+  '.cover-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }' +
+  '.cover-meta { margin-top: 20px; font-size: 11px; color: #6E7681; }' +
+
+  '.case-block { padding: 32px 0; break-inside: avoid; page-break-inside: avoid; }' +
+  '.case-block + .case-block { border-top: 2px solid #30363D; }' +
+  '.case-number { font-family: "JetBrains Mono", monospace; font-size: 10px; color: #6E7681; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }' +
+  '.case-title { font-family: "Playfair Display", serif; font-weight: 700; font-size: 20px; color: #E6EDF3; margin-bottom: 16px; }' +
+  '.case-text { line-height: 2.3; font-size: 15px; color: #E6EDF3; padding: 16px 20px; background: #161B22; border: 1px solid #30363D; border-radius: 10px; margin-bottom: 16px; }' +
+
+  '.summary-tbl { width: 100%; border-collapse: collapse; border: 1px solid #30363D; border-radius: 8px; overflow: hidden; background: #161B22; }' +
+  '.summary-tbl th { background: #1C2333; padding: 8px 14px; text-align: left; font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: #8B949E; border-bottom: 1px solid #30363D; }' +
+  '.summary-tbl td { padding: 8px 14px; border-bottom: 1px solid #30363D; vertical-align: top; }' +
+  '.summary-tbl tr:last-child td { border-bottom: none; }' +
+  '.comp-cell { font-weight: 700; font-family: "JetBrains Mono", monospace; font-size: 12px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }' +
+  '.comp-cell .cat-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }' +
+  '.tags-cell { line-height: 1.8; }' +
+  '.tag { font-size: 12px; padding: 2px 8px; border-radius: 5px; font-weight: 500; display: inline-block; margin: 2px 3px 2px 0; }' +
+
+  '.content-wrap { padding: 0 40px 40px 40px; }' +
+
+  '@media print {' +
+  '  body { background: #0D1117 !important; }' +
+  '  .case-block { break-inside: avoid; page-break-inside: avoid; }' +
+  '}' +
+  '</style></head><body>' +
+
+  '<div class="cover">' +
+  '  <div class="cover-title"><span class="t1">Co</span><span class="t2">Co</span><span class="t3">Pop</span></div>' +
+  '  <div class="cover-sub">Classificador de Casos Clínicos</div>' +
+  '  <div class="cover-legend">' +
+  '    <div class="cover-legend-item"><span class="cover-swatch" style="background:#E63946;"></span><b style="color:#E63946;">Co</b>&nbsp;Condition</div>' +
+  '    <div class="cover-legend-item"><span class="cover-swatch" style="background:#2A9D8F;"></span><b style="color:#2A9D8F;">Co</b>&nbsp;Context</div>' +
+  '    <div class="cover-legend-item"><span class="cover-swatch" style="background:#E9C46A;"></span><b style="color:#E9C46A;">Pop</b>&nbsp;Population</div>' +
+  '  </div>' +
+  '  <div class="cover-meta">Exportado em '+new Date().toLocaleDateString('pt-BR')+' às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · '+cases.length+' caso(s) clínico(s)</div>' +
+  '</div>' +
+
+  '<div class="content-wrap">' + casesHtml + '</div>' +
+
+  '</body></html>';
+
+  // Open in new window for print-to-PDF
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  if (!printWin) {
+    toast('Popup bloqueado — permita popups para este site');
+    return;
+  }
+  printWin.document.write(fullHtml);
+  printWin.document.close();
+
+  // Wait for fonts to load then trigger print
+  printWin.onload = () => {
+    setTimeout(() => {
+      printWin.focus();
+      printWin.print();
+      toast('Use "Salvar como PDF" na caixa de impressão ✓');
+    }, 600);
+  };
+
+  // Fallback if onload doesn't fire
+  setTimeout(() => {
+    if (!printWin.closed) {
+      printWin.focus();
+      printWin.print();
+    }
+  }, 2500);
 }
 
 function importJSON(event) {
