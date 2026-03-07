@@ -416,33 +416,6 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
 
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
-/* Modal */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(5px); display: flex;
-  align-items: center; justify-content: center;
-  z-index: 500; animation: fadeIn 0.2s ease;
-}
-
-.modal-overlay.hidden { display: none; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.modal {
-  background: var(--bg-secondary); border: 1px solid var(--border);
-  border-radius: 16px; padding: 2rem; width: 90%; max-width: 400px;
-  animation: modalIn 0.3s ease;
-}
-
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.modal h3 { font-family: 'Playfair Display', serif; font-size: 1.15rem; margin-bottom: 0.4rem; }
-.modal p { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1.2rem; line-height: 1.5; }
-.modal .form-row { display: flex; gap: 0.5rem; }
-.modal input { flex: 1; }
-
 /* Case selector dropdown for presentation mode */
 .case-selector {
   margin-bottom: 1.5rem;
@@ -640,6 +613,7 @@ function persistClassMap(id, m) { localStorage.setItem('cocopop_cl_' + id, JSON.
 
 // Admin
 function editMode() {
+  if (isAdmin) { toggleAdmin(); return; }
   isAdmin = true;
   showAdmin();
   toast('Painel do professor aberto');
@@ -1189,7 +1163,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     selectTool(null);
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('passwordModal').classList.add('hidden');
   }
   if (!e.target.matches('input, textarea, select')) {
     if (e.key === '1') selectTool('Co');
