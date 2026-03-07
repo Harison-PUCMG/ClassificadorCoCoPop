@@ -493,16 +493,6 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
 </head>
 <body>
 
-<div class="modal-overlay hidden" id="passwordModal">
-  <div class="modal">
-    <h3>🔐 Acesso do Professor</h3>
-    <p>Área restrita para cadastro prévio dos casos clínicos.</p>
-    <div class="form-row">
-      <input type="password" id="passwordInput" placeholder="Senha..." onkeydown="if(event.key==='Enter') checkPassword()">
-      <button class="btn btn-primary" onclick="checkPassword()">Entrar</button>
-    </div>
-  </div>
-</div>
 
 <div class="toast" id="toast"></div>
 
@@ -513,7 +503,7 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
   </div>
   <div class="header-right">
     <span class="mode-badge" id="modeBadge">AULA</span>
-    <button class="btn btn-icon" onclick="requestAdmin()" title="Painel do Professor">⚙️</button>
+    <button class="btn btn-icon" onclick="editMode()" title="Painel do Professor">⚙️</button>
   </div>
 </header>
 
@@ -632,7 +622,6 @@ textarea::placeholder, input::placeholder { color: var(--text-muted); }
 </div>
 
 <script>
-const ADMIN_PWD = 'prof2026';
 let isAdmin = false;
 let activeTool = null;
 let activeCaseId = null;
@@ -650,25 +639,10 @@ function loadClassMap(id) {
 function persistClassMap(id, m) { localStorage.setItem('cocopop_cl_' + id, JSON.stringify(m)); }
 
 // Admin
-function requestAdmin() {
-  if (isAdmin) { toggleAdmin(); return; }
-  document.getElementById('passwordModal').classList.remove('hidden');
-  const inp = document.getElementById('passwordInput');
-  inp.value = '';
-  setTimeout(() => inp.focus(), 120);
-}
-
-function checkPassword() {
-  if (document.getElementById('passwordInput').value === ADMIN_PWD) {
-    isAdmin = true;
-    document.getElementById('passwordModal').classList.add('hidden');
-    showAdmin();
-    toast('Painel do professor aberto');
-  } else {
-    toast('Senha incorreta');
-    document.getElementById('passwordInput').value = '';
-    document.getElementById('passwordInput').focus();
-  }
+function editMode() {
+  isAdmin = true;
+  showAdmin();
+  toast('Painel do professor aberto');
 }
 
 function showAdmin() {
@@ -1223,10 +1197,6 @@ document.addEventListener('keydown', e => {
     if (e.key === '3') selectTool('Pop');
     if (e.key === '0') selectTool('clear');
   }
-});
-
-document.getElementById('passwordModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
 });
 
 // Init
